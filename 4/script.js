@@ -1,14 +1,26 @@
 var gl;
-var mvMatrix = mat4.create ();
+var gmvMatrix = mat4.create ();
 var pMatrix = mat4.create ();
 var shaderProgram;
 var scene = [];
+var paused = false;
 
 function initGL (canvas) {
 	try {
 		gl = canvas.getContext("experimental-webgl");
-		gl.viewportWidth = canvas.width;
-		gl.viewportHeight = canvas.height;
+		gl.viewportWidth = canvas.width = document.width;
+		gl.viewportHeight = canvas.height = document.height;
+
+		$(document).keyup(function (e) {
+			if (e.keyCode == 32) {
+				if (paused) {
+					paused = false;
+					render ();
+				}
+				else
+					paused = true;
+			}
+		});
 	}
 	catch (e) {
 		if (!gl) 
@@ -102,7 +114,8 @@ function render () {
 	tick++;
 	updateScene ();
 	drawScene ();
-	window.requestAnimationFrame (render);
+	if (!paused)
+		window.requestAnimationFrame (render);
 }
 
 function webGLStart () {
@@ -127,13 +140,13 @@ function setupScene () {
 	p.update = function () {
 		mat4.identity (this.mvMatrix);
 		mat4.translate (this.mvMatrix, [-1.5, 0.0, -7.0]);
-		mat4.rotate (this.mvMatrix, Math.PI*tick/100, [0,1,0]);
+		mat4.rotate (this.mvMatrix, Math.PI*tick/200, [0,1,0]);
 	}
 
 	c.update = function () {
 		mat4.identity (this.mvMatrix);
 		mat4.translate (this.mvMatrix, [1.5, 0.0, -7.0]);
-		mat4.rotate (this.mvMatrix, Math.PI*tick/100, [1,1,1]);
+		mat4.rotate (this.mvMatrix, Math.PI*tick/200, [1,1,1]);
 	}
 	
 	scene.push(p);
@@ -154,6 +167,9 @@ function mvPop () {
 	mvMatrix = matrixStack.pop();
 }
 
+var FACE = 0;
+var VERTEX = 1;
+
 function geometry (colorBy, points) {
 	this.points = points;
 	this.pointIndices = {};
@@ -162,14 +178,14 @@ function geometry (colorBy, points) {
 	this.colorBy = colorBy; //vertex | face
 	this.mvMatrix = mat4.create ();
 
-	//set up point indcices, useful if we are sharing
+	//set up point indices, useful if we are sharing
 	//vertices
 	var pointIndex = 0;
 	for (var k in this.points)
 		this.pointIndices[k] = pointIndex++;
 
 	this.pushFace = function (name, key, color) {
-		if (this.colorBy == "face") {
+		if (this.colorBy == FACE) {
 			this.faces[name] = {
 				vertices: [],
 				color: color
@@ -185,12 +201,11 @@ function geometry (colorBy, points) {
 
 	this.setVertexColors = function (colors) {
 		this.vertexColors = colors;
-		this.colorBy = "vertex";
 	};
 
 	this.getVertices = function () {
 		var vertices = [];
-		if (this.colorBy == "vertex") {
+		if (this.colorBy == VERTEX) {
 			//concat each point from this.points
 			for (var k in this.points) {
 				vertices = vertices.concat(this.points[k]);
@@ -210,7 +225,7 @@ function geometry (colorBy, points) {
 
 	this.getColors = function () {
 		var colors = [];
-		if (this.colorBy == "vertex") {
+		if (this.colorBy == VERTEX) {
 			for(var k in this.points) {
 				colors = colors.concat (this.vertexColors[k]);
 			}
@@ -223,15 +238,16 @@ function geometry (colorBy, points) {
 				}
 			}
 		}
-		return new Float32Array(vertices);
+		return new Float32Array(colors);
 	};
 
 	this.getElementIndices = function () {
 		var indices = [];
-		if (this.colorBy == "vertex") {
+		if (this.colorBy == VERTEX) {
 			for (var f in this.faces) {
+				var currFace = this.faces[f];
 				for (var k in this.faces[f]) {
-					indices.push (this.pointIndices[this.faces[f]]);
+					indices.push (this.pointIndices[currFace[k]]);
 				}
 			}
 		}
@@ -265,8 +281,10 @@ function geometry (colorBy, points) {
 		gl.bufferData (gl.ARRAY_BUFFER, this.getColors (), gl.STATIC_DRAW);
 
 		this.indexBuffer = gl.createBuffer ();
+		var ei = this.getElementIndices ();
+		this.indexLength = ei.length;
 		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-		gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, this.getElementIndices (), gl.STATIC_DRAW);
+		gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, ei, gl.STATIC_DRAW);
 	};
 
 	this.draw = function () {
@@ -281,7 +299,7 @@ function geometry (colorBy, points) {
 		//elements
 		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
 		setMatrixUniforms (this.mvMatrix);
-		gl.drawElements (gl.TRIANGLES, this.indexBuffer.length, gl.UNSIGNED_SHORT, 0);
+		gl.drawElements (gl.TRIANGLES, this.indexLength, gl.UNSIGNED_SHORT, 0);
 	};
 
 	this.update = function () {};
@@ -308,7 +326,7 @@ var colors = {
  */
 
 function makeCube () {
-	var cube = new geometry ({
+	var cube = new geometry (FACE,{
 		A : [0.0, 0.0, 0.0],
 		B : [1.0, 0.0, 0.0],
 		C : [0.0, 1.0, 0.0],
@@ -338,11 +356,11 @@ function makeCube () {
  */
 
 function makePyramid () {
-	var p = new geometry ({
-		A : [ 0.0,  1.0,  0.0],
-		B : [-1.0, -1.0,  1.0],
-		C : [ 1.0, -1.0,  1.0],
-		D : [ 0.0, -1.0, -1.0]
+	var p = new geometry (VERTEX, {
+		A : [ 1.0,  0.0,  -1/Math.SQRT2],
+		B : [-1.0,  0.0,  -1/Math.SQRT2],
+		C : [ 0.0,  1.0,  1/Math.SQRT2],
+		D : [ 0.0, -1.0,  1/Math.SQRT2]
 	});
 
 	p.setVertexColors({
