@@ -1,11 +1,8 @@
 var gl;
-var triangleVertexPositionBuffer;
-var triangleColorBuffer;
-var squareVertexPositionBuffer;
-var squareColorBuffer;
 var mvMatrix = mat4.create ();
 var pMatrix = mat4.create ();
 var shaderProgram;
+var scene = [];
 
 function initGL (canvas) {
 	try {
@@ -74,55 +71,19 @@ function initShaders () {
 	shaderProgram.mvMatrixUniform = gl.getUniformLocation (shaderProgram, "uMVMatrix");
 }
 
-function setMatrixUniforms () {
+function setMatrixUniforms (mvMatrix) {
 	gl.uniformMatrix4fv (shaderProgram.pMatrixUniform, false, pMatrix);
 	gl.uniformMatrix4fv (shaderProgram.mvMatrixUniform, false, mvMatrix);
 }
 
 function initBuffers () {
-	triangleVertexPositionBuffer = gl.createBuffer ();
-	gl.bindBuffer (gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
-	var vertices = new Float32Array([
-		0.0, 1.0, 0.0,
-		-1.0, -1.0, 0.0,
-		1.0, -1.0, 0.0
-	]);
-	gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-	triangleVertexPositionBuffer.itemSize = 3;
-	triangleVertexPositionBuffer.numItems = 3;
+	for (var i = 0; i < scene.length; i++)
+		scene[i].initBuffers ();
+}
 
-	triangleColorBuffer = gl.createBuffer ();
-	gl.bindBuffer (gl.ARRAY_BUFFER, triangleColorBuffer);
-	var colors = new Float32Array([
-		1.0, 0.0, 0.0, 1.0,
-		0.0, 1.0, 0.0, 1.0,
-		0.0, 0.0, 1.0, 1.0
-	]);
-	gl.bufferData (gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
-	triangleColorBuffer.itemSize = 4;
-	triangleColorBuffer.numItems = 3;
-
-	squareVertexPositionBuffer = gl.createBuffer ();
-	gl.bindBuffer (gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-	vertices = new Float32Array([
-		1.0, 1.0, 0.0,
-		-1.0, 1.0, 0.0,
-		1.0, -1.0, 0.0,
-		-1.0, -1.0, 0.0
-	]);
-	gl.bufferData (gl.ARRAY_BUFFER, new Float32Array (vertices), gl.STATIC_DRAW);
-	squareVertexPositionBuffer.itemSize = 3;
-	squareVertexPositionBuffer.numItems = 4;
-
-	squareColorBuffer = gl.createBuffer ();
-	gl.bindBuffer (gl.ARRAY_BUFFER, squareColorBuffer);
-	var aColors = [];
-	for (var i = 0; i < 4; i++)
-		aColors = aColors.concat([0.5, 0.5, 1.0, 1.0]);
-	gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(aColors), gl.STATIC_DRAW);
-	squareColorBuffer.itemSize = 4;
-	squareColorBuffer.numItems = 4;
-
+function updateScene () {
+	for (var i = 0; i < scene.length; i++)
+		scene[i].update ();
 }
 
 function drawScene () {
@@ -131,39 +92,26 @@ function drawScene () {
 	
 	mat4.perspective (45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 
-	mat4.identity (mvMatrix);
-	mat4.translate (mvMatrix, [-1.5, 0.0, -7.0]);
-	mvPush ();
-	mat4.rotate (mvMatrix, Math.PI*tick/100, [0,1,0]);
+	for (var i = 0; i < scene.length; i++) {
+		scene[i].draw ();
+	}
+}
 
-	gl.bindBuffer (gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
-	gl.vertexAttribPointer (shaderProgram.vertexPositionAttribute, 
-		triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-	gl.bindBuffer (gl.ARRAY_BUFFER, triangleColorBuffer);
-	gl.vertexAttribPointer(shaderProgram.vertexColorAttribute,
-		triangleColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
-
-	setMatrixUniforms ();
-	gl.drawArrays (gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
-
-	mvPop ();
-	mat4.translate (mvMatrix, [3.0, 0.0, 0.0]);
-	mat4.rotate (mvMatrix, Math.PI*tick/100, [1, 0, 0]);
-
-	gl.bindBuffer (gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-	gl.vertexAttribPointer (shaderProgram.vertexPositionAttribute, 
-		squareVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
-	gl.bindBuffer (gl.ARRAY_BUFFER, squareColorBuffer);
-	gl.vertexAttribPointer (shaderProgram.vertexColorAttribute,
-		squareColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
-	setMatrixUniforms ();
-	gl.drawArrays (gl.TRIANGLE_STRIP, 0, squareVertexPositionBuffer.numItems);
+var tick = 0;
+function render () {
+	tick++;
+	updateScene ();
+	drawScene ();
+	window.requestAnimationFrame (render);
 }
 
 function webGLStart () {
 	var canvas = document.getElementById ("lesson1");
 	initGL (canvas);
 	initShaders ();
+
+	setupScene ();
+
 	initBuffers ();
 
 	gl.clearColor (0.0, 0.0, 0.0, 1.0);
@@ -172,11 +120,24 @@ function webGLStart () {
 	render ();
 }
 
-var tick = 0;
-function render () {
-	tick++;
-	drawScene ();
-	window.requestAnimationFrame (render);
+function setupScene () {
+	var p = makePyramid ();
+	var c = makeCube ();
+
+	p.update = function () {
+		mat4.identity (this.mvMatrix);
+		mat4.translate (this.mvMatrix, [-1.5, 0.0, -7.0]);
+		mat4.rotate (this.mvMatrix, Math.PI*tick/100, [0,1,0]);
+	}
+
+	c.update = function () {
+		mat4.identity (this.mvMatrix);
+		mat4.translate (this.mvMatrix, [1.5, 0.0, -7.0]);
+		mat4.rotate (this.mvMatrix, Math.PI*tick/100, [1,1,1]);
+	}
+	
+	scene.push(p);
+	scene.push(c);
 }
 
 var matrixStack = [];
@@ -193,25 +154,147 @@ function mvPop () {
 	mvMatrix = matrixStack.pop();
 }
 
-function geometry (points) {
+function geometry (colorBy, points) {
 	this.points = points;
-	this.vertices = [];
+	this.pointIndices = {};
+	this.vertexColors = {};
 	this.faces = {};
+	this.colorBy = colorBy; //vertex | face
+	this.mvMatrix = mat4.create ();
 
-	this.pushFace = function (name, key) {
-		this.faces[name] = [];
-		for(var i = 0; i < key.length; i++) {
-			var point = this.points[key[i]];
-			this.vertices = this.vertices.concat (point);
-			this.faces[name].push (point);
+	//set up point indcices, useful if we are sharing
+	//vertices
+	var pointIndex = 0;
+	for (var k in this.points)
+		this.pointIndices[k] = pointIndex++;
+
+	this.pushFace = function (name, key, color) {
+		if (this.colorBy == "face") {
+			this.faces[name] = {
+				vertices: [],
+				color: color
+			};
+			for(var i = 0; i < key.length; i++) {
+				var point = this.points[key[i]];
+				this.faces[name].vertices.push (point);
+			}
 		}
-	}
+		else
+			this.faces[name] = key;
+	};
+
+	this.setVertexColors = function (colors) {
+		this.vertexColors = colors;
+		this.colorBy = "vertex";
+	};
+
+	this.getVertices = function () {
+		var vertices = [];
+		if (this.colorBy == "vertex") {
+			//concat each point from this.points
+			for (var k in this.points) {
+				vertices = vertices.concat(this.points[k]);
+			}
+		}
+		else {
+			//for each face, concat each vertex
+			for (var fKey in this.faces) {
+				var face = this.faces[fKey];
+				for (var i = 0; i < face.vertices.length; i++) {
+					vertices = vertices.concat (face.vertices[i]);
+				}
+			}
+		}
+		return new Float32Array(vertices);
+	};
+
+	this.getColors = function () {
+		var colors = [];
+		if (this.colorBy == "vertex") {
+			for(var k in this.points) {
+				colors = colors.concat (this.vertexColors[k]);
+			}
+		}
+		else {
+			for (var fKey in this.faces) {
+				var face = this.faces[fKey];
+				for (var i = 0; i < face.vertices.length; i++) {
+					colors = colors.concat (face.color);
+				}
+			}
+		}
+		return new Float32Array(vertices);
+	};
+
+	this.getElementIndices = function () {
+		var indices = [];
+		if (this.colorBy == "vertex") {
+			for (var f in this.faces) {
+				for (var k in this.faces[f]) {
+					indices.push (this.pointIndices[this.faces[f]]);
+				}
+			}
+		}
+		else {
+			//treat faces as triangle strips.
+			var vc = 0;
+			for (var f in this.faces) {
+				var vertices = this.faces[f].vertices;
+				var first = vc;
+				var second = vc+1;
+				for (var i = 2; i < vertices.length; i++)
+				{
+					indices.push (vc + i - 2);
+					indices.push (vc + i - 1);
+					indices.push (vc + i);
+				}
+				vc += vertices.length;
+			}
+		}
+
+		return new Uint16Array (indices);
+	};
+
+	this.initBuffers = function () {
+		this.positionBuffer = gl.createBuffer ();
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.positionBuffer);
+		gl.bufferData (gl.ARRAY_BUFFER, this.getVertices (), gl.STATIC_DRAW);
+
+		this.colorBuffer = gl.createBuffer ();
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.colorBuffer);
+		gl.bufferData (gl.ARRAY_BUFFER, this.getColors (), gl.STATIC_DRAW);
+
+		this.indexBuffer = gl.createBuffer ();
+		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+		gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, this.getElementIndices (), gl.STATIC_DRAW);
+	};
+
+	this.draw = function () {
+		//position
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.positionBuffer);
+		gl.vertexAttribPointer (shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+		//color
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.colorBuffer);
+		gl.vertexAttribPointer (shaderProgram.vertexColorAttribute, 4, gl.FLOAT, false, 0, 0);
+
+		//elements
+		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+		setMatrixUniforms (this.mvMatrix);
+		gl.drawElements (gl.TRIANGLES, this.indexBuffer.length, gl.UNSIGNED_SHORT, 0);
+	};
+
+	this.update = function () {};
+
 }
 
 var colors = {
 	"red"    : [1.0, 0.0, 0.0, 1.0],
 	"blue"   : [0.0, 0.0, 1.0, 1.0],
-	"green"  : [0.0, 1.0, 0.0, 1.0]
+	"green"  : [0.0, 1.0, 0.0, 1.0],
+	"yellow" : [1.0, 1.0, 0.0, 1.0],
+	"orange" : [1.0, 0.5, 0.0, 1.0],
+	"purple" : [1.0, 0.0, 1.0, 1.0]
 };
 
 /* Cube vertex labels:
@@ -220,12 +303,11 @@ var colors = {
  *  * A      * B
  *
  *
- *
  *       * G      * H
  *  * C      * D
  */
 
-function cubeGeometry () {
+function makeCube () {
 	var cube = new geometry ({
 		A : [0.0, 0.0, 0.0],
 		B : [1.0, 0.0, 0.0],
@@ -237,12 +319,12 @@ function cubeGeometry () {
 		H : [1.0, 1.0, 1.0]
 	});
 
-	cube.pushFace ('front', 'ABDC');
-	cube.pushFace ('back', 'EFHG');
-	cube.pushFace ('top', 'AEFB');
-	cube.pushFace ('bottom', 'GHDC');
-	cube.pushFace ('right', 'BFHD');
-	cube.pushFace ('left', 'AEGC');
+	cube.pushFace ('front', 'ABCD', colors.red);
+	cube.pushFace ('back', 'EFGH', colors.green);
+	cube.pushFace ('top', 'AEBF', colors.blue);
+	cube.pushFace ('bottom', 'GHCD', colors.yellow);
+	cube.pushFace ('right', 'BFDH', colors.orange);
+	cube.pushFace ('left', 'AECG', colors.purple);
 
 	return cube;
 }
@@ -255,12 +337,19 @@ function cubeGeometry () {
  *  * B      * C
  */
 
-function pyramidGeometry () {
+function makePyramid () {
 	var p = new geometry ({
 		A : [ 0.0,  1.0,  0.0],
 		B : [-1.0, -1.0,  1.0],
 		C : [ 1.0, -1.0,  1.0],
 		D : [ 0.0, -1.0, -1.0]
+	});
+
+	p.setVertexColors({
+		A : colors.red,
+		B : colors.green,
+		C : colors.blue,
+		D : colors.yellow
 	});
 
 	p.pushFace ('front', 'ABC');
