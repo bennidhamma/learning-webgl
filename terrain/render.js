@@ -5,6 +5,12 @@ var shaderProgram;
 var scene = [];
 var paused = false;
 
+var camera = {
+	pos : vec3.fromValues (0, 0, -10),
+	lookat : vec3.fromValues (0, 0, 0),
+	up : vec3.fromValues (0, 1, 0)
+};
+
 function initGL (canvas) {
 	try {
 		gl = canvas.getContext("experimental-webgl");
@@ -119,7 +125,7 @@ function render () {
 }
 
 function webGLStart () {
-	var canvas = document.getElementById ("lesson1");
+	var canvas = document.getElementById ("viewer");
 	initGL (canvas);
 	initShaders ();
 
@@ -133,6 +139,7 @@ function webGLStart () {
 	render ();
 }
 
+/*
 function setupScene () {
 	var p = makePyramid ();
 	var c = makeCube ();
@@ -152,6 +159,7 @@ function setupScene () {
 	scene.push(p);
 	scene.push(c);
 }
+*/
 
 var matrixStack = [];
 
