@@ -118,7 +118,7 @@ function setupCube (x, y, z) {
 	console.log( 'creating cube', x, y, z);
 	var cube = makeCube ();
 	cube.updateMatrix = function () {
-		mat4.translate (mvMatrix, mvMatrix, [x, y, -z]);
+		mat4.translate (mvMatrix, mvMatrix, [x, -z, y]);
 	};
 	scene.push (cube);
 }

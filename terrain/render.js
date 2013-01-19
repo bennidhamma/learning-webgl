@@ -115,8 +115,8 @@ function drawScene () {
 	mat4.identity(mvMatrix);
 	//mat4.lookAt (mvMatrix, camera.eye, camera.center, camera.up);
 	
-	mat4.rotateY(mvMatrix, mvMatrix, camera.yaw);
 	mat4.rotateX(mvMatrix, mvMatrix, camera.pitch);
+	mat4.rotateY(mvMatrix, mvMatrix, camera.yaw);
 	mat4.translate(mvMatrix,mvMatrix,camera.eye);
 
 	for (var i = 0; i < scene.length; i++) {
@@ -176,7 +176,7 @@ function handleEvents () {
 		}
 	}
 
-	var amount = 1/10;
+	var amount = 1/3;
 	if (events.keyboard[KeyEvent.DOM_VK_DOWN] ||
 		events.keyboard[KeyEvent.DOM_VK_S])
 		speed = amount;
@@ -200,6 +200,7 @@ function handleEvents () {
 	{
 		camera.eye[0] += Math.sin(camera.yaw) * speed;
 		camera.eye[2] -= Math.cos(camera.yaw) * speed;
+		camera.eye[1] -= Math.sin(camera.pitch) * speed;
 	}
 }
 
