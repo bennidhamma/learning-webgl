@@ -7,7 +7,8 @@ function makeTerrain (size, height, roughness)
 	//initialize a 2D array of correct size.
 	var grid = new Grid(size, size, 0);
 	
-	midpointDisplace (grid, height, roughness, 0, 0, size - 1, size - 1);
+	if (height)
+		midpointDisplace (grid, height, roughness, 0, 0, size - 1, size - 1);
 
 	return grid;
 }
@@ -81,67 +82,43 @@ function Grid(w, h, defaultValue) {
 
 function setupScene () {
 
+	/*
 	var p = makePyramid ();
 	var c = makeCube ();
 
-	/*
-	p.update = function () {
-		mat4.identity (this.mvMatrix);
-		mat4.translate (this.mvMatrix, [-1.5, 0.0, -7.0]);
-		mat4.rotate (this.mvMatrix, Math.PI*tick/200, [1,0,0]);
+
+	p.updateMatrix = function () {
+		mat4.translate (mvMatrix, mvMatrix, [-1.5, 0.0, -7.0]);
+		mat4.rotate (mvMatrix, mvMatrix, Math.PI*tick/200, [1,0,0]);
 	}
 
-	c.update = function () {
-		mat4.identity (this.mvMatrix);
-		mat4.translate (this.mvMatrix, [1.5, 0.0, -7.0]);
-		mat4.rotate (this.mvMatrix, Math.PI*tick/200, [1,1,1]);
+	c.updateMatrix = function () {
+		mat4.translate (mvMatrix, mvMatrix, [1.5, 0.0, -7.0]);
+		mat4.rotate (mvMatrix, mvMatrix, Math.PI*tick/200, [1,1,1]);
 	}
-
+	
 	
 	scene.push(p);
 	scene.push(c);
 	return;
 	*/
-	var size = 5;
-	var roughness = 0.5;
-	var height = 100;
+
+	var size = 65;
+	var roughness = 0.7;
+	var height = 30;
 	var terrain = makeTerrain (size, height, roughness);
 
 	for (var x = 0; x < size; x++)
 		for (var y = 0; y < size; y++)
 			setupCube (x, y, terrain.get (x, y));
 
-	setupEvents ();
-}
-
-function setupEvents() {
-	var mx = -1;
-	var my = -1;
-	$('canvas').mousemove(function(e) {
-		if (event.which == 1)
-		{
-			if (mx == -1) {
-				mx = e.pageX;
-				my = e.pageY;
-			}
-			else {
-				var dx = mx - e.pageX;
-				var dy = mx - e.pageY;
-				camera.pos[0] += dx;
-				camera.pos[1] += dy;
-				mx = e.pageX;
-				my = e.pageY;
-			}
-		}
-	});
 }
 
 function setupCube (x, y, z) {
 	console.log( 'creating cube', x, y, z);
 	var cube = makeCube ();
-	cube.update = function () {
-		mat4.lookAt (cube.mvMatrix, camera.pos, camera.target, camera.up);
-		mat4.translate (cube.mvMatrix, cube.mvMatrix, [x, y, -z]);
+	cube.updateMatrix = function () {
+		mat4.translate (mvMatrix, mvMatrix, [x, y, -z]);
 	};
 	scene.push (cube);
 }

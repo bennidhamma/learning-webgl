@@ -1,18 +1,20 @@
 var gl;
-var gmvMatrix = mat4.create ();
+var mvMatrix = mat4.create ();
 var pMatrix = mat4.create ();
 var shaderProgram;
 var scene = [];
 var paused = false;
+var canvas;
 
 var camera = {
-	pos : vec3.fromValues (0, 0, -10),
-	lookat : vec3.fromValues (0, 0, 0),
-	up : vec3.fromValues (0, 1, 0)
+	eye : vec3.fromValues (0, 0, -10),
+	pitch : 0,
+	yaw : 0
 };
 
-function initGL (canvas) {
+function initGL (_canvas) {
 	try {
+		canvas = _canvas;
 		gl = canvas.getContext("experimental-webgl");
 		gl.viewportWidth = canvas.width = document.width;
 		gl.viewportHeight = canvas.height = document.height;
@@ -89,7 +91,7 @@ function initShaders () {
 	shaderProgram.mvMatrixUniform = gl.getUniformLocation (shaderProgram, "uMVMatrix");
 }
 
-function setMatrixUniforms (mvMatrix) {
+function setMatrixUniforms () {
 	gl.uniformMatrix4fv (shaderProgram.pMatrixUniform, false, pMatrix);
 	gl.uniformMatrix4fv (shaderProgram.mvMatrixUniform, false, mvMatrix);
 }
@@ -108,7 +110,14 @@ function drawScene () {
 	gl.viewport (0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.clear (gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	
-	mat4.perspective (45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+	mat4.perspective (pMatrix, Math.PI / 4, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
+
+	mat4.identity(mvMatrix);
+	//mat4.lookAt (mvMatrix, camera.eye, camera.center, camera.up);
+	
+	mat4.rotateY(mvMatrix, mvMatrix, camera.yaw);
+	mat4.rotateX(mvMatrix, mvMatrix, camera.pitch);
+	mat4.translate(mvMatrix,mvMatrix,camera.eye);
 
 	for (var i = 0; i < scene.length; i++) {
 		scene[i].draw ();
@@ -118,15 +127,85 @@ function drawScene () {
 var tick = 0;
 function render () {
 	tick++;
+	handleEvents ();
 	updateScene ();
 	drawScene ();
 	if (!paused)
 		window.requestAnimationFrame (render);
 }
 
+var events = {
+	mouse : {x:null, y:null},
+	keyboard : []
+};
+
+var lastEvents = null;
+
+function setupEvents () {
+	$(canvas)
+	.keydown (function (e) {
+		events.keyboard[e.which] = true;
+	})
+	.keyup (function (e) {
+		events.keyboard[e.which] = false;
+	})
+	.mousemove (function (e) {
+		events.mouse.which = e.which;
+		events.mouse.x = e.clientX;
+		events.mouse.y = e.clientY;
+	});
+}
+
+var mx = null, my = null;
+var speed = 0;
+function handleEvents () {
+	if (lastEvents != null && lastEvents.mouse.which == 0 && events.mouse.which == 1)
+	{
+		mx = events.mouse.x;
+		my = events.mouse.y;
+	}
+	else if (lastEvents != null && events.mouse.which == 1)
+	{
+		if (events.mouse.x != mx) {
+			camera.yaw -= (mx - events.mouse.x) / 100;
+			mx = events.mouse.x;
+		}
+		if (events.mouse.y != my) {
+			camera.pitch -= (my - events.mouse.y) / 100;
+			my = events.mouse.y;
+		}
+	}
+
+	var amount = 1/10;
+	if (events.keyboard[KeyEvent.DOM_VK_DOWN] ||
+		events.keyboard[KeyEvent.DOM_VK_S])
+		speed = amount;
+	else if (events.keyboard[KeyEvent.DOM_VK_UP] ||
+		events.keyboard[KeyEvent.DOM_VK_W])
+		speed = -amount;
+	else
+		speed = 0;
+
+	/*
+	if (events.keyboard[KeyEvent.DOM_VK_A])
+		camera.eye[0] += amount;
+	if (events.keyboard[KeyEvent.DOM_VK_D])
+		camera.eye[0] -= amount;
+	*/
+
+	lastEvents = {};
+	$.extend (true, lastEvents, events);
+
+	if (speed != 0)
+	{
+		camera.eye[0] += Math.sin(camera.yaw) * speed;
+		camera.eye[2] -= Math.cos(camera.yaw) * speed;
+	}
+}
+
 function webGLStart () {
-	var canvas = document.getElementById ("viewer");
-	initGL (canvas);
+	var c = document.getElementById ("viewer");
+	initGL (c);
 	initShaders ();
 
 	setupScene ();
@@ -136,36 +215,14 @@ function webGLStart () {
 	gl.clearColor (0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 
+	setupEvents ();
 	render ();
 }
-
-/*
-function setupScene () {
-	var p = makePyramid ();
-	var c = makeCube ();
-
-	p.update = function () {
-		mat4.identity (this.mvMatrix);
-		mat4.translate (this.mvMatrix, [-1.5, 0.0, -7.0]);
-		mat4.rotate (this.mvMatrix, Math.PI*tick/200, [1,0,0]);
-	}
-
-	c.update = function () {
-		mat4.identity (this.mvMatrix);
-		mat4.translate (this.mvMatrix, [1.5, 0.0, -7.0]);
-		mat4.rotate (this.mvMatrix, Math.PI*tick/200, [1,1,1]);
-	}
-	
-	scene.push(p);
-	scene.push(c);
-}
-*/
 
 var matrixStack = [];
 
 function mvPush () {
-	var copy = mat4.create ();
-	mat4.set (mvMatrix, copy);
+	var copy = mat4.clone (mvMatrix);
 	matrixStack.push(copy);
 }
 
@@ -184,7 +241,6 @@ function geometry (colorBy, points) {
 	this.vertexColors = {};
 	this.faces = {};
 	this.colorBy = colorBy; //vertex | face
-	this.mvMatrix = mat4.create ();
 
 	//set up point indices, useful if we are sharing
 	//vertices
@@ -306,12 +362,16 @@ function geometry (colorBy, points) {
 
 		//elements
 		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-		setMatrixUniforms (this.mvMatrix);
+		mvPush();
+		this.updateMatrix ();
+		setMatrixUniforms ();
+		mvPop();
 		gl.drawElements (gl.TRIANGLES, this.indexLength, gl.UNSIGNED_SHORT, 0);
 	};
 
 	this.update = function () {};
 
+	this.updateMatrix = function () {};
 }
 
 var colors = {
