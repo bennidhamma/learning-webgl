@@ -4,6 +4,20 @@
 	
 		<title>Terrain </title>
 
+		<style>
+			canvas {margin-bottom:10px;}
+			table {
+				float:right;
+				border-collapse:collapse;
+			}
+			td {
+			   	border:1px solid black;
+				width:15px;
+				text-align:center;
+				padding:5px;
+		   	}
+		</style>
+
 		<script id="shader-fs" type="FRAGMENT_SHADER">
 			precision mediump float;
 
@@ -24,8 +38,7 @@
 			varying vec4 vColor;
 
 			void main (void) {
-				gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
-				vColor = aVertexColor;
+				gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); vColor = aVertexColor;
 			}
 		</script>
 
@@ -42,6 +55,7 @@
 		</script>
 	</head>
 	<body>
+		<canvas id="bitmap"></canvas>
 		<canvas id="viewer" tabindex="0">
 			
 		</canvas>
