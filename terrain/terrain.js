@@ -30,15 +30,38 @@ function midpointDisplace(g, h, r, x0, y0, x1, y1)
 
 	//now do 4 midpoints of square
 	
-	
+	//diamond width, heights.
+	var dw = Math.round((x1 - x0)/2);
+	var dh = Math.round((y1 - y0)/2);
+
 	//top
-	g.set(px, y0, getMidpoint(g.get(x0,y0), g.get(x1,y0), h));
+	g.set(px, y0, getMidpoint(
+		g.get(x0,y0), 
+		g.get(x1,y0), 
+		g.get(px, (y0 - dh + g.height) % g.height),
+		g.get(px, (y0 + dh + g.height) % g.height),
+		h));
 	//bottom
-	g.set(px, y1, getMidpoint(g.get(x0,y1), g.get(x1,y1), h));
+	g.set(px, y1, getMidpoint(
+		g.get(x0,y1), 
+		g.get(x1,y1),
+		g.get(px, (y1 - dh + g.height) % g.height),
+		g.get(px, (y1 + dh + g.height) % g.height),
+		h));
 	//left
-	g.set(x0, py, getMidpoint(g.get(x0,y0), g.get(x0,y1), h));
+	g.set(x0, py, getMidpoint(
+		g.get(x0,y0),
+	   	g.get(x0,y1),
+		g.get((x0 - dw + g.width) % g.width, py),
+		g.get((x0 + dw + g.width) % g.width, py),
+	   	h));
 	//right
-	g.set(x1, py, getMidpoint(g.get(x1,y0), g.get(x1,y1), h));
+	g.set(x1, py, getMidpoint(
+		g.get(x1,y0),
+	   	g.get(x1,y1),
+		g.get((x1 - dw + g.width) % g.width, py),
+		g.get((x1 + dw + g.width) % g.width, py),
+	   	h));
 
 	if (px <= x0 || py <= y0)
 		return;
@@ -46,21 +69,21 @@ function midpointDisplace(g, h, r, x0, y0, x1, y1)
 	//recurse on 4 sub squares
 
 	//top-left
-	midpointDisplace(g, h / 2, r, x0, y0, px, py);
+	midpointDisplace(g, h / 2 * r, r, x0, y0, px, py);
 
 	//top-right
-	midpointDisplace(g, h / 2, r, px, y0, x1, py);
+	midpointDisplace(g, h / 2 * r, r, px, y0, x1, py);
 
 	//bottom-left
-	midpointDisplace(g, h / 2, r, x0, py, px, y1);
+	midpointDisplace(g, h / 2 * r, r, x0, py, px, y1);
 
 	//bottom-right
-	midpointDisplace(g, h / 2, r, px, py, x1, y1);
+	midpointDisplace(g, h / 2 * r, r, px, py, x1, y1);
 }
 
-function getMidpoint(a, b, h)
+function getMidpoint(a, b, c, d, h)
 {
-	return Math.round((a + b) / 2 + Math.random() * h - h / 2);
+	return Math.round((a + b + c + d) / 4 + Math.random() * h - h / 2);
 }
 
 function isPowerOfTwo (x)
@@ -129,12 +152,10 @@ function Cube(w, h) {
 	}
 }
 
-function setupScene () {
-
-	/*
+function simpleScene () {
+	
 	var p = makePyramid ();
 	var c = makeCube ();
-
 
 	p.updateMatrix = function () {
 		mat4.translate (mvMatrix, mvMatrix, [-1.5, 0.0, -7.0]);
@@ -146,14 +167,46 @@ function setupScene () {
 		mat4.rotate (mvMatrix, mvMatrix, Math.PI*tick/200, [1,1,1]);
 	}
 	
-	
 	scene.push(p);
 	scene.push(c);
-	return;
+	
+
+	/*
+	var c1 = makeCube (colors.green);
+	var c2 = makeCube (colors.red);
 	*/
 
-	var size = 65;
-	var roughness = 0.9;
+	var composite = new geometry ();
+
+	for (var i = 0; i < 2; i++) {
+		addSimpleCube (composite, i);
+	}
+
+	scene.push (composite);
+	window.c = composite;
+
+	return;
+}
+
+function addSimpleCube (composite, i) {
+	var c = makeCube ();
+
+	c.updateMatrix = function () {
+	//	mat4.translate (mvMatrix, mvMatrix, [Math.sin(i/100)*100, Math.cos(i/100)*100, Math.sin(i/10)*10]);
+		mat4.translate (mvMatrix, mvMatrix, [i, i, i]);
+	};
+
+	composite.addChild (c);
+}
+
+function setupScene () {
+	if (query.scene == 'simple') {
+		simpleScene ();
+		return;
+	}
+
+	var size = 33;
+	var roughness = 0.7;
 	var height = 30;
 	var terrain = makeTerrain (size, height, roughness);
 	window.terrain = terrain;
@@ -163,7 +216,12 @@ function setupScene () {
 			setupColumn (x, y, terrain.get (x, y));
 
 	printToCanvas (terrain);
+	scene.push (terrainCombine);
+
+	camera.eye[1] -= 20;
 }
+
+var terrainCombine = new geometry ();
 
 function setupColumn (x, y, col) {
 	for (var z = col.bottom; z <= col.top; z++) {
@@ -177,7 +235,8 @@ function setupCube (x, y, z) {
 	cube.updateMatrix = function () {
 		mat4.translate (mvMatrix, mvMatrix, [x, z, y]);
 	};
-	scene.push (cube);
+	//scene.push (cube);
+	terrainCombine.addChild (cube);
 }
 
 function color3i (r, g, b) {
@@ -185,7 +244,7 @@ function color3i (r, g, b) {
 }
 
 function printToCanvas (g) {
-	var blockSize = 10;
+	var blockSize = 5;
 	//var c = $('<canvas width=' + g.width * blockSize + ' height=' + g.height * blockSize + '>');
 	var c = $('#bitmap');
 	c.attr({width:g.width*blockSize,height:g.height*blockSize});
@@ -200,7 +259,7 @@ function printToCanvas (g) {
 		//var tr = $('<tr>');
 		//t.append(tr);
 		for (var y = 0; y < g.height; y++) {
-			var z = g.get (x, y);
+			var z = g.get (x, y).top;
 		//	 $('<td>').text(z).appendTo(tr);
 			
 			if (z > max) max = z;
@@ -210,7 +269,7 @@ function printToCanvas (g) {
 
 	for (var x = 0; x < g.width; x++) {
 		for (var y = 0; y < g.height; y++) {
-			var z = g.get (x, y);
+			var z = g.get (x, y).top;
 			var color = Math.round((z-min)/(max-min)* 255);
 			ctx.fillStyle = color3i(color, color, color);
 			ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);

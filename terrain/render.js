@@ -5,8 +5,13 @@ var shaderProgram;
 var scene = [];
 var paused = false;
 var canvas;
+var query = {};
 
 var camera = {
+	RIGHT : vec3.fromValues (1, 0, 0),
+	FORWARD : vec3.fromValues (0, 0, -1),
+	forward : vec3.fromValues (0, 0, -1),
+	right : vec3.fromValues (1, 0, 0),
 	eye : vec3.fromValues (0, 0, -10),
 	pitch : 0,
 	yaw : 0
@@ -14,6 +19,7 @@ var camera = {
 
 function initGL (_canvas) {
 	try {
+		mat4.identity(mvMatrix);
 		canvas = _canvas;
 		gl = canvas.getContext("experimental-webgl");
 		gl.viewportWidth = canvas.width = document.width;
@@ -110,18 +116,52 @@ function drawScene () {
 	gl.viewport (0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.clear (gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	
-	mat4.perspective (pMatrix, Math.PI / 4, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
+	mat4.perspective (pMatrix, Math.PI / 4, gl.viewportWidth / gl.viewportHeight, 0.1, 1000.0);
 
 	mat4.identity(mvMatrix);
-	//mat4.lookAt (mvMatrix, camera.eye, camera.center, camera.up);
 	
 	mat4.rotateX(mvMatrix, mvMatrix, camera.pitch);
 	mat4.rotateY(mvMatrix, mvMatrix, camera.yaw);
+
+	//now move model view matrix to camera pos.
 	mat4.translate(mvMatrix,mvMatrix,camera.eye);
 
 	for (var i = 0; i < scene.length; i++) {
 		scene[i].draw ();
 	}
+}
+
+function getUpVector () {
+	var mat = mat4.create();
+	mat4.identity(mat);
+	
+	mat4.rotateX(mat, mat, camera.pitch);
+	mat4.rotateY(mat, mat, camera.yaw);
+
+	var v = vec3.fromValues(0,1,0);
+	return vec3.transformMat4(v, v, mat);
+}
+
+function getForwardVector () {
+	var mat = mat4.create();
+	mat4.identity(mat);
+	
+	mat4.rotateX(mat, mat, camera.pitch);
+	mat4.rotateY(mat, mat, camera.yaw);
+
+	var v = vec3.fromValues(0,0,-1);
+	return vec3.scale(v, vec3.transformMat4(v, v, mat), -1);
+}
+
+function getRightVector () {
+	var mat = mat4.create();
+	mat4.identity(mat);
+	
+	mat4.rotateX(mat, mat, camera.pitch);
+	mat4.rotateY(mat, mat, camera.yaw);
+
+	var v = vec3.fromValues(1,0,0);
+	return vec3.scale(v, vec3.transformMat4(v, v, mat), 1);
 }
 
 var tick = 0;
@@ -177,6 +217,7 @@ function handleEvents () {
 	}
 
 	var amount = 1/3;
+	var strafe = 0;
 	if (events.keyboard[KeyEvent.DOM_VK_DOWN] ||
 		events.keyboard[KeyEvent.DOM_VK_S])
 		speed = amount;
@@ -186,12 +227,11 @@ function handleEvents () {
 	else
 		speed = 0;
 
-	/*
+	
 	if (events.keyboard[KeyEvent.DOM_VK_A])
-		camera.eye[0] += amount;
+		vec3.add (camera.eye, camera.eye, vec3.scale(vec3.create(), getRightVector(), amount));
 	if (events.keyboard[KeyEvent.DOM_VK_D])
-		camera.eye[0] -= amount;
-	*/
+		vec3.add (camera.eye, camera.eye, vec3.scale(vec3.create(), getRightVector(), -amount));
 
 	lastEvents = {};
 	$.extend (true, lastEvents, events);
@@ -206,6 +246,7 @@ function handleEvents () {
 
 function webGLStart () {
 	var c = document.getElementById ("viewer");
+	parseQuery ();
 	initGL (c);
 	initShaders ();
 
@@ -219,6 +260,17 @@ function webGLStart () {
 	setupEvents ();
 	render ();
 }
+
+function parseQuery () {
+	try {
+		var q = document.location.search.substr(1).split('&');
+		for (var i = 0; i < q.length; i++) {
+			var tuple = q[i].split('=');
+			query[tuple[0]] = tuple[1] || true;
+		}
+	}
+	catch (e) {}
+};
 
 var matrixStack = [];
 
@@ -285,7 +337,34 @@ function geometry (colorBy, points) {
 				}
 			}
 		}
-		return new Float32Array(vertices);
+
+		if (this.children) {
+			console.log ('getting child vertices');
+			var time = performance.now();
+			var cvs = [];
+			var vertexCount = 0;
+			for (var i = 0; i < this.children.length; i++) {
+				mvPush(mvMatrix);
+				this.children[i].updateMatrix ();
+				var cv = this.children[i].getVertices ();
+				for (var j = 0; j < cv.length; j+=3) {
+					var v = vec3.fromValues(cv[j], cv[j+1], cv[j+2]);
+					vec3.transformMat4(v, v, mvMatrix);
+					cv[j] = v[0];
+					cv[j+1] = v[1];
+					cv[j+2] = v[2];
+				}
+				mvPop(mvMatrix);
+				this.children[i].vertexStart = vertexCount;
+				cvs.push(cv);
+				vertexCount += cv.length / 3;
+				//vertices = vertices.concat(cv);
+			}
+			vertices = vertices.concat.apply(vertices, cvs);
+			console.log ("getvertices: ", performance.now()-time);
+		}
+
+		return vertices;
 	};
 
 	this.getColors = function () {
@@ -299,11 +378,25 @@ function geometry (colorBy, points) {
 			for (var fKey in this.faces) {
 				var face = this.faces[fKey];
 				for (var i = 0; i < face.vertices.length; i++) {
-					colors = colors.concat (face.color);
+					for (var j = 0; j < face.color.length; j++) {
+						colors.push(face.color[j]);
+					}
+					//colors = colors.concat (face.color);
 				}
 			}
 		}
-		return new Float32Array(colors);
+
+		if (this.children) {
+			console.log('getting child colors');
+			var time = performance.now();
+			var cs = [];
+			for (var i = 0; i < this.children.length; i++) {
+				cs.push(this.children[i].getColors ());
+			}
+			colors = colors.concat.apply(colors, cs);
+			console.log ("getcolors: ", performance.now()-time);
+		}
+		return colors;
 	};
 
 	this.getElementIndices = function () {
@@ -333,20 +426,32 @@ function geometry (colorBy, points) {
 			}
 		}
 
-		return new Uint16Array (indices);
+		if (this.children) {
+			var cis = [];
+			for (var i = 0; i < this.children.length; i++) {
+				var childIndices = this.children[i].getElementIndices ();
+				for (var j = 0; j < childIndices.length; j++) {
+					childIndices[j] += this.children[i].vertexStart;
+				}
+				cis.push (childIndices);
+			}
+			indices = indices.concat.apply(indices, cis);
+		}
+
+		return indices;
 	};
 
 	this.initBuffers = function () {
 		this.positionBuffer = gl.createBuffer ();
 		gl.bindBuffer (gl.ARRAY_BUFFER, this.positionBuffer);
-		gl.bufferData (gl.ARRAY_BUFFER, this.getVertices (), gl.STATIC_DRAW);
+		gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(this.getVertices ()), gl.STATIC_DRAW);
 
 		this.colorBuffer = gl.createBuffer ();
 		gl.bindBuffer (gl.ARRAY_BUFFER, this.colorBuffer);
-		gl.bufferData (gl.ARRAY_BUFFER, this.getColors (), gl.STATIC_DRAW);
+		gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(this.getColors ()), gl.STATIC_DRAW);
 
 		this.indexBuffer = gl.createBuffer ();
-		var ei = this.getElementIndices ();
+		var ei = new Uint16Array(this.getElementIndices ());
 		this.indexLength = ei.length;
 		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
 		gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, ei, gl.STATIC_DRAW);
@@ -373,6 +478,12 @@ function geometry (colorBy, points) {
 	this.update = function () {};
 
 	this.updateMatrix = function () {};
+
+	this.addChild = function (child) {
+		if (!this.children)
+			this.children = [];
+		this.children.push (child);
+	};
 }
 
 var colors = {
@@ -394,8 +505,8 @@ var colors = {
  *  * C      * D
  */
 
-function makeCube () {
-	var cube = new geometry (FACE,{
+function makeCube (color) {
+	var cube = new geometry (color ? VERTEX : FACE,{
 		A : [0.0, 0.0, 0.0],
 		B : [1.0, 0.0, 0.0],
 		C : [0.0, 1.0, 0.0],
@@ -405,6 +516,19 @@ function makeCube () {
 		G : [0.0, 1.0, 1.0],
 		H : [1.0, 1.0, 1.0]
 	});
+
+	if (color) {
+		cube.setVertexColors({
+			A : color,
+			B : color,
+			C : color,
+			D : color,
+			E : color,
+			F : color,
+			G : color,
+			H : color
+		});
+	}
 
 	cube.pushFace ('front', 'ABCD', colors.red);
 	cube.pushFace ('back', 'EFGH', colors.green);
