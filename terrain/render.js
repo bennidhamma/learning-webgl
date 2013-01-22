@@ -157,8 +157,8 @@ function getRightVector () {
 	var mat = mat4.create();
 	mat4.identity(mat);
 	
-	mat4.rotateX(mat, mat, camera.pitch);
-	mat4.rotateY(mat, mat, camera.yaw);
+	mat4.rotateX(mat, mat, -camera.pitch);
+	mat4.rotateY(mat, mat, -camera.yaw);
 
 	var v = vec3.fromValues(1,0,0);
 	return vec3.scale(v, vec3.transformMat4(v, v, mat), 1);
