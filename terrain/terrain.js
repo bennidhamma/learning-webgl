@@ -205,9 +205,9 @@ function setupScene () {
 		return;
 	}
 
-	var size = 33;
+	var size = parseInt(query.size) || 33;
 	var roughness = 0.7;
-	var height = 30;
+	var height = parseInt(query.height) || 30;
 	var terrain = makeTerrain (size, height, roughness);
 	window.terrain = terrain;
 

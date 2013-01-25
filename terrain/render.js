@@ -25,6 +25,11 @@ function initGL (_canvas) {
 		gl.viewportWidth = canvas.width = document.width;
 		gl.viewportHeight = canvas.height = document.height;
 
+  		// Enable all of the vertex attribute arrays.
+		//gl.enableVertexAttribArray(0);
+		//gl.enableVertexAttribArray(1);
+		//gl.enableVertexAttribArray(2);
+
 		$(document).keyup(function (e) {
 			if (e.keyCode == 32) {
 				if (paused) {
@@ -135,10 +140,10 @@ function getUpVector () {
 	var mat = mat4.create();
 	mat4.identity(mat);
 	
-	mat4.rotateX(mat, mat, camera.pitch);
-	mat4.rotateY(mat, mat, camera.yaw);
+	mat4.rotateX(mat, mat, -camera.pitch);
+	mat4.rotateY(mat, mat, -camera.yaw);
 
-	var v = vec3.fromValues(0,1,0);
+	var v = vec3.fromValues(0,-1,0);
 	return vec3.transformMat4(v, v, mat);
 }
 
@@ -146,8 +151,8 @@ function getForwardVector () {
 	var mat = mat4.create();
 	mat4.identity(mat);
 	
-	mat4.rotateX(mat, mat, camera.pitch);
-	mat4.rotateY(mat, mat, camera.yaw);
+	mat4.rotateX(mat, mat, -camera.pitch);
+	mat4.rotateY(mat, mat, -camera.yaw);
 
 	var v = vec3.fromValues(0,0,-1);
 	return vec3.scale(v, vec3.transformMat4(v, v, mat), -1);
@@ -232,6 +237,10 @@ function handleEvents () {
 		vec3.add (camera.eye, camera.eye, vec3.scale(vec3.create(), getRightVector(), amount));
 	if (events.keyboard[KeyEvent.DOM_VK_D])
 		vec3.add (camera.eye, camera.eye, vec3.scale(vec3.create(), getRightVector(), -amount));
+	if (events.keyboard[KeyEvent.DOM_VK_Q])
+		vec3.add (camera.eye, camera.eye, vec3.scale(vec3.create(), getUpVector(), amount));
+	if (events.keyboard[KeyEvent.DOM_VK_Z])
+		vec3.add (camera.eye, camera.eye, vec3.scale(vec3.create(), getUpVector(), -amount));
 
 	lastEvents = {};
 	$.extend (true, lastEvents, events);
@@ -285,15 +294,11 @@ function mvPop () {
 	mvMatrix = matrixStack.pop();
 }
 
-var FACE = 0;
-var VERTEX = 1;
-
-function geometry (colorBy, points) {
+function geometry (points) {
 	this.points = points;
 	this.pointIndices = {};
 	this.vertexColors = {};
 	this.faces = {};
-	this.colorBy = colorBy; //vertex | face
 
 	//set up point indices, useful if we are sharing
 	//vertices
@@ -301,23 +306,8 @@ function geometry (colorBy, points) {
 	for (var k in this.points)
 		this.pointIndices[k] = pointIndex++;
 
-	this.pushFace = function (name, key, color) {
-		if (this.colorBy == FACE) {
-			this.faces[name] = {
-				vertices: [],
-				color: color
-			};
-			for(var i = 0; i < key.length; i++) {
-				var point = this.points[key[i]];
-				this.faces[name].vertices.push (point);
-			}
-		}
-		else
-			this.faces[name] = key;
-	};
-
-	this.setVertexColors = function (colors) {
-		this.vertexColors = colors;
+	this.pushFace = function (name, key, textureCoords) {
+		this.faces[name] = key;
 	};
 
 	this.getVertices = function () {
@@ -495,6 +485,15 @@ var colors = {
 	"purple" : [1.0, 0.0, 1.0, 1.0]
 };
 
+var faces = {
+	FRONT = 1,
+	BACK = 2,
+	TOP = 4,
+	BOTTOM = 8,
+	RIGHT = 16,
+	LEFT = 32
+};
+
 /* Cube vertex labels:
  *
  *       * E      * F
@@ -505,8 +504,8 @@ var colors = {
  *  * C      * D
  */
 
-function makeCube (color) {
-	var cube = new geometry (color ? VERTEX : FACE,{
+function makeCube (options) {
+	var cube = new geometry ({
 		A : [0.0, 0.0, 0.0],
 		B : [1.0, 0.0, 0.0],
 		C : [0.0, 1.0, 0.0],
@@ -517,25 +516,12 @@ function makeCube (color) {
 		H : [1.0, 1.0, 1.0]
 	});
 
-	if (color) {
-		cube.setVertexColors({
-			A : color,
-			B : color,
-			C : color,
-			D : color,
-			E : color,
-			F : color,
-			G : color,
-			H : color
-		});
-	}
-
-	cube.pushFace ('front', 'ABCD', colors.red);
-	cube.pushFace ('back', 'EFGH', colors.green);
-	cube.pushFace ('top', 'AEBF', colors.blue);
-	cube.pushFace ('bottom', 'GHCD', colors.yellow);
-	cube.pushFace ('right', 'BFDH', colors.orange);
-	cube.pushFace ('left', 'AECG', colors.purple);
+	cube.pushFace ('front',  'ABCD', [0,0,1,0,1,1,0,1]);
+	cube.pushFace ('back',   'EFGH', [1,0,1,1,0,1,0,0]);
+	cube.pushFace ('top',    'AEBF', [0,1,0,0,1,0,1,1]);
+	cube.pushFace ('bottom', 'GHCD', [1,1,0,1,0,0,1,0]);
+	cube.pushFace ('right',  'BFDH', [1,0,1,1,0,1,0,0]);
+	cube.pushFace ('left',   'AECG', [0,0,1,0,1,1,0,1]);
 
 	return cube;
 }
