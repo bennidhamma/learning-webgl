@@ -132,23 +132,26 @@ function Grid(w, h, defaultValue) {
 	}
 }
 
+//cube can only be 1024 x 1024 x 1024.
 function Cube(w, h) {
 	this.width = w;
 	this.height = h;
+	this.cells = {};
 
-	var array = new Array(w * h);
-
-	for(var i = 0; i < w * h; i++)
-		array[i] = {top:0, bottom:0}
-
-	this.get = function(x,y) {
-		return array[y * w + x];
+	this.getTriple = function(triple) {
+		var triple = setTriple (pos[0], pos[1], pos[2]);
+		return cells[triple];
 	}
 
-	this.set = function(x,y,top,bottom) {
-		var cell = array[y * w + x];
-		cell.top = top;
-		cell.bottom = bottom;
+//	this.getVec = function (x, y, z) {
+
+	this.setVec = function(pos, v) {
+		var triple = setTriple (pos[0], pos[1], pos[2]);
+		cells[triple] = v;
+	}
+
+	this.setTriple = function(triple, v) {
+		cells[triple] = v;
 	}
 }
 

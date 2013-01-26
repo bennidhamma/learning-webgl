@@ -25,11 +25,6 @@ function initGL (_canvas) {
 		gl.viewportWidth = canvas.width = document.width;
 		gl.viewportHeight = canvas.height = document.height;
 
-  		// Enable all of the vertex attribute arrays.
-		//gl.enableVertexAttribArray(0);
-		//gl.enableVertexAttribArray(1);
-		//gl.enableVertexAttribArray(2);
-
 		$(document).keyup(function (e) {
 			if (e.keyCode == 32) {
 				if (paused) {
@@ -294,138 +289,36 @@ function mvPop () {
 	mvMatrix = matrixStack.pop();
 }
 
-function geometry (points) {
-	this.points = points;
-	this.pointIndices = {};
-	this.vertexColors = {};
-	this.faces = {};
+function geometry (vertices) {
+	this.vertices = vertices;
+	this.faces = [];
 
-	//set up point indices, useful if we are sharing
-	//vertices
-	var pointIndex = 0;
-	for (var k in this.points)
-		this.pointIndices[k] = pointIndex++;
-
-	this.pushFace = function (name, key, textureCoords) {
-		this.faces[name] = key;
+	this.pushFace = function (faceInfo) {
+		this.faces.push(faceInfo);
 	};
 
 	this.getVertices = function () {
-		var vertices = [];
-		if (this.colorBy == VERTEX) {
-			//concat each point from this.points
-			for (var k in this.points) {
-				vertices = vertices.concat(this.points[k]);
-			}
-		}
-		else {
-			//for each face, concat each vertex
-			for (var fKey in this.faces) {
-				var face = this.faces[fKey];
-				for (var i = 0; i < face.vertices.length; i++) {
-					vertices = vertices.concat (face.vertices[i]);
-				}
-			}
-		}
-
-		if (this.children) {
-			console.log ('getting child vertices');
-			var time = performance.now();
-			var cvs = [];
-			var vertexCount = 0;
-			for (var i = 0; i < this.children.length; i++) {
-				mvPush(mvMatrix);
-				this.children[i].updateMatrix ();
-				var cv = this.children[i].getVertices ();
-				for (var j = 0; j < cv.length; j+=3) {
-					var v = vec3.fromValues(cv[j], cv[j+1], cv[j+2]);
-					vec3.transformMat4(v, v, mvMatrix);
-					cv[j] = v[0];
-					cv[j+1] = v[1];
-					cv[j+2] = v[2];
-				}
-				mvPop(mvMatrix);
-				this.children[i].vertexStart = vertexCount;
-				cvs.push(cv);
-				vertexCount += cv.length / 3;
-				//vertices = vertices.concat(cv);
-			}
-			vertices = vertices.concat.apply(vertices, cvs);
-			console.log ("getvertices: ", performance.now()-time);
-		}
-
-		return vertices;
-	};
-
-	this.getColors = function () {
-		var colors = [];
-		if (this.colorBy == VERTEX) {
-			for(var k in this.points) {
-				colors = colors.concat (this.vertexColors[k]);
-			}
-		}
-		else {
-			for (var fKey in this.faces) {
-				var face = this.faces[fKey];
-				for (var i = 0; i < face.vertices.length; i++) {
-					for (var j = 0; j < face.color.length; j++) {
-						colors.push(face.color[j]);
-					}
-					//colors = colors.concat (face.color);
-				}
-			}
-		}
-
-		if (this.children) {
-			console.log('getting child colors');
-			var time = performance.now();
-			var cs = [];
-			for (var i = 0; i < this.children.length; i++) {
-				cs.push(this.children[i].getColors ());
-			}
-			colors = colors.concat.apply(colors, cs);
-			console.log ("getcolors: ", performance.now()-time);
-		}
-		return colors;
+		var vs = [];
+		vs = vs.concat.apply(vs, this.vertices);
+		return vs;
 	};
 
 	this.getElementIndices = function () {
 		var indices = [];
-		if (this.colorBy == VERTEX) {
-			for (var f in this.faces) {
-				var currFace = this.faces[f];
-				for (var k in this.faces[f]) {
-					indices.push (this.pointIndices[currFace[k]]);
-				}
-			}
-		}
-		else {
-			//treat faces as triangle strips.
-			var vc = 0;
-			for (var f in this.faces) {
-				var vertices = this.faces[f].vertices;
-				var first = vc;
-				var second = vc+1;
-				for (var i = 2; i < vertices.length; i++)
-				{
-					indices.push (vc + i - 2);
-					indices.push (vc + i - 1);
-					indices.push (vc + i);
-				}
-				vc += vertices.length;
-			}
-		}
 
-		if (this.children) {
-			var cis = [];
-			for (var i = 0; i < this.children.length; i++) {
-				var childIndices = this.children[i].getElementIndices ();
-				for (var j = 0; j < childIndices.length; j++) {
-					childIndices[j] += this.children[i].vertexStart;
-				}
-				cis.push (childIndices);
+		//treat faces as triangle strips.
+		var vc = 0;
+		for (var f in this.faces) {
+			var indices = this.faces[f].indices;
+			var first = vc;
+			var second = vc+1;
+			for (var i = 2; i < indices.length; i++)
+			{
+				indices.push (vc + i - 2);
+				indices.push (vc + i - 1);
+				indices.push (vc + i);
 			}
-			indices = indices.concat.apply(indices, cis);
+			vc += indices.length;
 		}
 
 		return indices;
@@ -483,15 +376,6 @@ var colors = {
 	"yellow" : [1.0, 1.0, 0.0, 1.0],
 	"orange" : [1.0, 0.5, 0.0, 1.0],
 	"purple" : [1.0, 0.0, 1.0, 1.0]
-};
-
-var faces = {
-	FRONT = 1,
-	BACK = 2,
-	TOP = 4,
-	BOTTOM = 8,
-	RIGHT = 16,
-	LEFT = 32
 };
 
 /* Cube vertex labels:
