@@ -89,12 +89,13 @@ function initShaders () {
 		"aVertexPosition");
 	gl.enableVertexAttribArray (shaderProgram.vertexPositionAttribute);
 
-	shaderProgram.vertexColorAttribute = gl.getAttribLocation (shaderProgram,
-		"aVertexColor");
-	gl.enableVertexAttribArray (shaderProgram.vertexColorAttribute);
+	shaderProgram.vertexTextureAttribute = gl.getAttribLocation (shaderProgram,
+		"aTextureCoord");
+	gl.enableVertexAttribArray (shaderProgram.vertexTextureAttribute);
 
 	shaderProgram.pMatrixUniform = gl.getUniformLocation (shaderProgram, "uPMatrix");
 	shaderProgram.mvMatrixUniform = gl.getUniformLocation (shaderProgram, "uMVMatrix");
+	shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
 }
 
 function setMatrixUniforms () {
@@ -324,14 +325,30 @@ function geometry (vertices) {
 		return indices;
 	};
 
+	this.setTexture = function (texture) {
+		this.texture = texture;
+	};
+
+	this.getTextureCoords = function () {
+		var coords = [];
+		var coordSets = [];
+
+		//treat faces as triangle strips.
+		for (var f in this.faces) {
+			coordSets.push (this.faces[f].texCoords);
+		}
+
+		return coords.concat.apply (coords, coordSets);
+	};
+
 	this.initBuffers = function () {
 		this.positionBuffer = gl.createBuffer ();
 		gl.bindBuffer (gl.ARRAY_BUFFER, this.positionBuffer);
 		gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(this.getVertices ()), gl.STATIC_DRAW);
 
-		this.colorBuffer = gl.createBuffer ();
-		gl.bindBuffer (gl.ARRAY_BUFFER, this.colorBuffer);
-		gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(this.getColors ()), gl.STATIC_DRAW);
+		this.textureBuffer = gl.createBuffer ();
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.textureBuffer);
+		gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(this.getTextureCoords ()), gl.STATIC_DRAW);
 
 		this.indexBuffer = gl.createBuffer ();
 		var ei = new Uint16Array(this.getElementIndices ());
@@ -345,9 +362,12 @@ function geometry (vertices) {
 		gl.bindBuffer (gl.ARRAY_BUFFER, this.positionBuffer);
 		gl.vertexAttribPointer (shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
 
-		//color
-		gl.bindBuffer (gl.ARRAY_BUFFER, this.colorBuffer);
-		gl.vertexAttribPointer (shaderProgram.vertexColorAttribute, 4, gl.FLOAT, false, 0, 0);
+		//texture
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.textureBuffer);
+		gl.vertexAttribPointer (shaderProgram.vertexTextureAttribute, 4, gl.FLOAT, false, 0, 0);
+		gl.activeTexture (gl.TEXTURE0);
+		gl.bindTexture (gl.TEXTURE_2D, this.texture);
+		gl.uniform1i (shaderProgram.samplerUniform, 0);
 
 		//elements
 		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);

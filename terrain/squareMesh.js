@@ -44,14 +44,19 @@ function SquareMesh () {
 			//
 			// If a face is visible, add it to the geometry.
 
-			for (var face in faces) {
+			for (var faceKey in faces) {
 				var pos = getTriple(triple);
-				if (this.isFaceVisible (pos, faces[face]) {
-					var faceInfo = this.prepareFace (pos, face, texture);
+				var face = faces[faceKey];
+				if (this.isFaceVisible (pos, faces[face])) {
+					var faceInfo = this.prepareFace (pos, face, cube.cells[triple]);
 					mesh.pushFace (faceInfo);
 				}
 			}
 		}
+
+		mesh.setTexture (terrainTexture);
+
+		return mesh;
 	};
 
 	this.isFaceVisible = function (pos, face) {
@@ -59,31 +64,38 @@ function SquareMesh () {
 		return true;
 	}
 
-	this.addFace = function (pos, face, texture) {
+	this.prepareFace = function (pos, face, texture) {
 		var texCoords = null;
 		var vertexKey = null;
+		var texIndex = 0;
 		if (face == faces.FRONT) {
-			vertexKey =  'ABCD'
+			vertexKey =  'ABCD';
+			texIndex = texture[faceIndices.FRONT];
 			texCoords = [0,0,1,0,1,1,0,1];
 		}
 		else if (face == faces.BACK) {
-			vertexKey = 'EFGH'
+			vertexKey = 'EFGH';
+			texIndex = texture[faceIndices.BACK];
 			texCoords =	[1,0,1,1,0,1,0,0];
 		}
 		else if (face == faces.TOP) {
 			vertexKey = 'AEBF'
+			texIndex = texture[faceIndices.TOP];
 			texCoords = [0,1,0,0,1,0,1,1];
 		}
 		else if (face == faces.BOTTOM) {
 			vertexKey = 'GHCD'
+			texIndex = texture[faceIndices.BOTTOM];
 			texCoords = [1,1,0,1,0,0,1,0];
 		}
 		else if (face == faces.RIGHT) {
 			vertexKey = 'BFDH'
+			texIndex = texture[faceIndices.RIGHT];
 			texCoords =	[1,0,1,1,0,1,0,0];
 		}
 		else if (face == faces.LEFT) {
 			vertexKey = 'AECG'
+			texIndex = texture[faceIndices.LEFT];
 			texCoords =[0,0,1,0,1,1,0,1];
 		}
 
@@ -97,6 +109,12 @@ function SquareMesh () {
 		}
 
 		//prepare texture.
+		var s = texIndex % TEXTURE_WIDTH;
+		var t = texIndex / TEXTURE_HEIGHT;
+		for (var i = 0; i < 4; i += 2) {
+			texCoords[i*2] = (s + texCoords[i*2]) / TEXTURE_WIDTH;
+			texCoords[i*2+1] = (t + texCoords[i*2+1]) / TEXTURE_HEIGHT;
+		}
 
 		return {indices:indices, texCoords:texCoords};
 	}
@@ -127,11 +145,20 @@ var faces = {
 	LEFT : 32
 };
 
+var faceIndices = {
+	FRONT : 0,
+	BACK : 1,
+	TOP : 2,
+	BOTTOM : 3,
+	RIGHT : 4,
+	LEFT : 5
+};
 
 var terrainTexture;
 
 function loadTextures () {
 	var texture = gl.createTexture ();
+	terrainTexture = texture;
 	var filename = 'terrain.png';
 	var img = new Image ();
 	img.onload = function () {
@@ -140,27 +167,24 @@ function loadTextures () {
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-		terrainTexture = texture;
 	};
 	img.src = filename;
 };
 
+var TEXTURE_WIDTH = 16;
+var TEXTURE_HEIGHT = 16;
+
+// [FRONT, BACK, TOP, BOTTOM, RIGHT, LEFT]
 var cubeTypes = {
-	'grass' : {
-		top : 0,
-		sides : 3,
-		bottom : 2
-	},
-	'rock' : {
-		top : 1,
-		sides : 1,
-		bottom : 1
-	}
+	'grass' : 	[3, 3, 0, 3, 3, 2],
+	'rock' :  	[1, 1, 1, 1, 1, 1]
 };
 
 function demoSquareMesh () {
 	var mesh = new SquareMesh ();
 
 	mesh.addCube (vec3.fromValues(0,0,0), cubeTypes.grass);
-	mesh.addCube (vec3.fromValues(1,0,0), cubeType.grass);
+	mesh.addCube (vec3.fromValues(1,0,0), cubeTypes.grass);
+
+	scene.push (mesh.createGeometry());
 }

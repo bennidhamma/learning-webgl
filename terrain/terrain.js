@@ -147,11 +147,11 @@ function Cube(w, h) {
 
 	this.setVec = function(pos, v) {
 		var triple = setTriple (pos[0], pos[1], pos[2]);
-		cells[triple] = v;
+		this.cells[triple] = v;
 	}
 
 	this.setTriple = function(triple, v) {
-		cells[triple] = v;
+		this.cells[triple] = v;
 	}
 }
 
@@ -205,6 +205,10 @@ function addSimpleCube (composite, i) {
 function setupScene () {
 	if (query.scene == 'simple') {
 		simpleScene ();
+		return;
+	}
+	else if (query.scene == 'demoMesh') {
+		demoSquareMesh ();
 		return;
 	}
 
