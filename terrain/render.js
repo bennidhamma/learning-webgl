@@ -255,6 +255,7 @@ function webGLStart () {
 	initGL (c);
 	initShaders ();
 
+	loadTextures (render);
 	setupScene ();
 
 	initBuffers ();
@@ -263,7 +264,7 @@ function webGLStart () {
 	gl.enable(gl.DEPTH_TEST);
 
 	setupEvents ();
-	render ();
+	
 }
 
 function parseQuery () {
@@ -308,18 +309,15 @@ function geometry (vertices) {
 		var indices = [];
 
 		//treat faces as triangle strips.
-		var vc = 0;
 		for (var f in this.faces) {
-			var indices = this.faces[f].indices;
-			var first = vc;
-			var second = vc+1;
-			for (var i = 2; i < indices.length; i++)
+			var faceIndices = this.faces[f].indices;
+			var vc = 0;
+			for (var i = 2; i < faceIndices.length; i++)
 			{
-				indices.push (vc + i - 2);
-				indices.push (vc + i - 1);
-				indices.push (vc + i);
+				indices.push (faceIndices[vc + i - 2]);
+				indices.push (faceIndices[vc + i - 1]);
+				indices.push (faceIndices[vc + i]);
 			}
-			vc += indices.length;
 		}
 
 		return indices;
@@ -364,7 +362,7 @@ function geometry (vertices) {
 
 		//texture
 		gl.bindBuffer (gl.ARRAY_BUFFER, this.textureBuffer);
-		gl.vertexAttribPointer (shaderProgram.vertexTextureAttribute, 4, gl.FLOAT, false, 0, 0);
+		gl.vertexAttribPointer (shaderProgram.vertexTextureAttribute, 2, gl.FLOAT, false, 0, 0);
 		gl.activeTexture (gl.TEXTURE0);
 		gl.bindTexture (gl.TEXTURE_2D, this.texture);
 		gl.uniform1i (shaderProgram.samplerUniform, 0);

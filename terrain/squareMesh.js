@@ -22,21 +22,23 @@ function SquareMesh () {
 	var vertices = [];
 
 	this.addCube = function (pos, type) {
+		var triple = 0;
 		//test to see if we need to create new points.
 		for (var k in basePoints) {
-			var vertex = vec3.add (vec3.create(), basePoints[k], pos);
-			var triple = setTriplev (vertex);
+			var v = vec3.add (vec3.create(), basePoints[k], pos);
+			triple = setTriplev (v);
 			if (pointIndices[triple] == null) {
 				pointIndices[triple] = pointCount++;
-				vertices.push(vertex);
+				vertices.push([v[0], v[1], v[2]]);
 			}
 		}
 		//now add the cube.
+		triple = setTriplev(pos);
 		cube.setTriple(triple, type); 
 	};
 
 	this.createGeometry = function () {
-		mesh = new geometry ();
+		mesh = new geometry (vertices);
 
 		for (var triple in cube.cells) {
 			// Need to test this cell against its neighbors 
@@ -110,10 +112,10 @@ function SquareMesh () {
 
 		//prepare texture.
 		var s = texIndex % TEXTURE_WIDTH;
-		var t = texIndex / TEXTURE_HEIGHT;
-		for (var i = 0; i < 4; i += 2) {
-			texCoords[i*2] = (s + texCoords[i*2]) / TEXTURE_WIDTH;
-			texCoords[i*2+1] = (t + texCoords[i*2+1]) / TEXTURE_HEIGHT;
+		var t = texIndex / TEXTURE_HEIGHT >> 0;
+		for (var i = 0; i < 8; i+=2) {
+			texCoords[i] = (s + texCoords[i]) / TEXTURE_WIDTH;
+			texCoords[i+1] = (t + texCoords[i+1]) / TEXTURE_HEIGHT;
 		}
 
 		return {indices:indices, texCoords:texCoords};
@@ -123,8 +125,8 @@ function SquareMesh () {
 function getTriple (i) {
 	return [
 		i >> 20, //x
-		i << 12 >> 22, //y
-		i << 21 >> 21 //z
+		i << 12 >>> 22, //y
+		i << 22 >>> 22 //z
 	];
 }
 
@@ -134,6 +136,24 @@ function setTriple(x,y,z) {
 
 function setTriplev(v) {
 	return (v[0] << 20) + (v[1] << 10) + v[2];
+}
+
+function tripleTests () {
+	var sets = [
+		[0, 0, 0],
+		[1, 1, 0],
+		[1, 2, 1],
+		[1023, 1023, 1023]
+	];
+
+	for (var i = 0; i < sets.length; i++) {
+		var ex = sets[i];
+		var triple = setTriplev (ex);
+		var ac = getTriple(triple);
+		if (ex[0] != ac[0] || ex[1] != ac[1] || ex[2] != ac[2]) {
+			console.error ("error with ", ex, ac);
+		}
+	}
 }
 
 var faces = {
@@ -156,7 +176,7 @@ var faceIndices = {
 
 var terrainTexture;
 
-function loadTextures () {
+function loadTextures (callback) {
 	var texture = gl.createTexture ();
 	terrainTexture = texture;
 	var filename = 'terrain.png';
@@ -167,6 +187,7 @@ function loadTextures () {
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		callback ();
 	};
 	img.src = filename;
 };
