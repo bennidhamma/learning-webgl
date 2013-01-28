@@ -1,3 +1,5 @@
+var showFace = null;
+
 function SquareMesh () {
 
 	var basePoints = {
@@ -17,28 +19,16 @@ function SquareMesh () {
 	}
 
 	var cube = new Cube ();
-	var pointIndices = {};
-	var pointCount = 0;
-	var vertices = [];
 
 	this.addCube = function (pos, type) {
 		var triple = 0;
-		//test to see if we need to create new points.
-		for (var k in basePoints) {
-			var v = vec3.add (vec3.create(), basePoints[k], pos);
-			triple = setTriplev (v);
-			if (pointIndices[triple] == null) {
-				pointIndices[triple] = pointCount++;
-				vertices.push([v[0], v[1], v[2]]);
-			}
-		}
 		//now add the cube.
 		triple = setTriplev(pos);
 		cube.setTriple(triple, type); 
 	};
 
 	this.createGeometry = function () {
-		mesh = new geometry (vertices);
+		mesh = new geometry ();
 
 		for (var triple in cube.cells) {
 			// Need to test this cell against its neighbors 
@@ -46,12 +36,18 @@ function SquareMesh () {
 			//
 			// If a face is visible, add it to the geometry.
 
-			for (var faceKey in faces) {
-				var pos = getTriple(triple);
-				var face = faces[faceKey];
-				if (this.isFaceVisible (pos, faces[face])) {
-					var faceInfo = this.prepareFace (pos, face, cube.cells[triple]);
-					mesh.pushFace (faceInfo);
+			var pos = getTriple(triple);
+			if (showFace) {
+				var faceInfo = this.prepareFace (pos, showFace, cube.cells[triple]);
+				mesh.pushFace (faceInfo);
+			}
+			else {
+				for (var faceKey in faces) {
+					var face = faces[faceKey];
+					if (this.isFaceVisible (pos, faces[face])) {
+						var faceInfo = this.prepareFace (pos, face, cube.cells[triple]);
+						mesh.pushFace (faceInfo);
+					}
 				}
 			}
 		}
@@ -71,43 +67,44 @@ function SquareMesh () {
 		var vertexKey = null;
 		var texIndex = 0;
 		if (face == faces.FRONT) {
-			vertexKey =  'ABCD';
+			vertexKey =  'EFGH';
 			texIndex = texture[faceIndices.FRONT];
-			texCoords = [0,0,1,0,1,1,0,1];
+			texCoords = [0,1,1,1,0,0,1,0];
 		}
 		else if (face == faces.BACK) {
-			vertexKey = 'EFGH';
+			vertexKey = 'ABCD';
 			texIndex = texture[faceIndices.BACK];
-			texCoords =	[1,0,1,1,0,1,0,0];
+			texCoords =	[1,1,0,1,1,0,0,0];
 		}
 		else if (face == faces.TOP) {
-			vertexKey = 'AEBF'
+			vertexKey = 'GHCD'
 			texIndex = texture[faceIndices.TOP];
-			texCoords = [0,1,0,0,1,0,1,1];
+			texCoords = [0,0,1,0,0,1,1,1];
 		}
 		else if (face == faces.BOTTOM) {
-			vertexKey = 'GHCD'
+			vertexKey = 'AEBF'
 			texIndex = texture[faceIndices.BOTTOM];
-			texCoords = [1,1,0,1,0,0,1,0];
+			texCoords = [0,0,1,0,0,1,1,1];
 		}
 		else if (face == faces.RIGHT) {
 			vertexKey = 'BFDH'
 			texIndex = texture[faceIndices.RIGHT];
-			texCoords =	[1,0,1,1,0,1,0,0];
+			texCoords =	[0,1,1,1,0,0,1,0];
 		}
 		else if (face == faces.LEFT) {
 			vertexKey = 'AECG'
 			texIndex = texture[faceIndices.LEFT];
-			texCoords =[0,0,1,0,1,1,0,1];
+			texCoords =[0,1,1,1,0,0,1,0];
 		}
 
-		//prepare indices
-		var indices = [];
+		var vertices = [];
+		// Prepare vertices
 		for (var i = 0; i < 4; i++) {
-			var letter = vertexKey[i];
-			var v = vec3.add(vec3.create(), pos, basePoints[letter]);
-			var triple = setTriplev(v);
-			indices.push (pointIndices[triple]);
+			var k = vertexKey[i];
+			var v = vec3.add (vec3.create(), basePoints[k], pos);
+			vertices.push (v[0]);
+			vertices.push (v[1]);
+			vertices.push (v[2]);
 		}
 
 		//prepare texture.
@@ -118,7 +115,7 @@ function SquareMesh () {
 			texCoords[i+1] = (t + texCoords[i+1]) / TEXTURE_HEIGHT;
 		}
 
-		return {indices:indices, texCoords:texCoords};
+		return {vertices: vertices, texCoords: texCoords};
 	}
 }
 
@@ -197,7 +194,7 @@ var TEXTURE_HEIGHT = 16;
 
 // [FRONT, BACK, TOP, BOTTOM, RIGHT, LEFT]
 var cubeTypes = {
-	'grass' : 	[3, 3, 0, 3, 3, 2],
+	'grass' : 	[3, 3, 0, 2, 3, 3],
 	'rock' :  	[1, 1, 1, 1, 1, 1]
 };
 
@@ -208,4 +205,28 @@ function demoSquareMesh () {
 	mesh.addCube (vec3.fromValues(1,0,0), cubeTypes.grass);
 
 	scene.push (mesh.createGeometry());
+
+	$('body').keyup (function (e) {
+		if (e.which == KeyEvent.DOM_VK_F) {
+			if (showFace == faces.LEFT) {
+				showFace = null;
+			}
+			else if (showFace == null) {
+				showFace = faces.FRONT;
+			}
+			else {
+				showFace *= 2;
+			}
+			var geo = mesh.createGeometry ();
+			geo.initBuffers ();
+			scene = [];
+			scene.push (geo);
+			console.log ("Show face: ", getKeyFromValue(faces, showFace));
+		}
+	});
+}
+
+function getKeyFromValue (obj, val) {
+	for (var k in obj)
+		if (obj[k] == val) return k;
 }

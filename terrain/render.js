@@ -291,35 +291,39 @@ function mvPop () {
 	mvMatrix = matrixStack.pop();
 }
 
-function geometry (vertices) {
-	this.vertices = vertices;
+function geometry () {
 	this.faces = [];
+	this.faceCount = 0;
 
 	this.pushFace = function (faceInfo) {
 		this.faces.push(faceInfo);
+		this.faceCount++;
 	};
 
 	this.getVertices = function () {
 		var vs = [];
-		vs = vs.concat.apply(vs, this.vertices);
-		return vs;
+		//treat faces as triangle strips.
+		for (var f = 0; f < this.faceCount; f++) {
+			vs.push(this.faces[f].vertices);
+		};
+		return vs.concat.apply([], vs);
 	};
 
 	this.getElementIndices = function () {
 		var indices = [];
-
+		var totalCount = 0;
 		//treat faces as triangle strips.
-		for (var f in this.faces) {
-			var faceIndices = this.faces[f].indices;
-			var vc = 0;
-			for (var i = 2; i < faceIndices.length; i++)
+		for (var f = 0; f < this.faceCount; f++) {
+			var length = this.faces[f].vertices.length / 3;
+			var vc = totalCount;
+			for (var i = 2; i < length; i++)
 			{
-				indices.push (faceIndices[vc + i - 2]);
-				indices.push (faceIndices[vc + i - 1]);
-				indices.push (faceIndices[vc + i]);
+				indices.push (vc + i - 2);
+				indices.push (vc + i - 1);
+				indices.push (vc + i);
 			}
+			totalCount += length;
 		}
-
 		return indices;
 	};
 
@@ -330,11 +334,25 @@ function geometry (vertices) {
 	this.getTextureCoords = function () {
 		var coords = [];
 		var coordSets = [];
-
-		//treat faces as triangle strips.
-		for (var f in this.faces) {
+		for (var f = 0; f < this.faceCount; f++) {
 			coordSets.push (this.faces[f].texCoords);
 		}
+		
+		/*
+		//treat faces as triangle strips.
+		for (var f in this.faces) {
+			var faceCoords = this.faces[f].texCoords;
+			var vc = 0;
+			for (var i = 2; i < faceCoords.length; i++)
+			{
+				coords.push (faceCoords[vc + i - 2]);
+				coords.push (faceCoords[vc + i - 1]);
+				coords.push (faceCoords[vc + i]);
+			}
+		}
+
+		return coords;
+		*/
 
 		return coords.concat.apply (coords, coordSets);
 	};
