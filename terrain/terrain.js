@@ -92,11 +92,25 @@ function isPowerOfTwo (x)
 }
 
 function extrude (grid) {
-	var cube = new Cube(grid.width, grid.height);
+	var cube = new SquareMesh ();
+	cube.grid = grid;
+	
+	// Normalize range to ensure that the minimum is 0.
+	var min = Infinity;
+	for (var x = 0; x < grid.width; x++) {
+		for (var y = 0; y < grid.height; y++) {
+			var z = grid.get (x,y);
+			if (z < min) min = z;
+		}
+	}
+	var adj = 0 - min;
 
 	for (var x = 0; x < grid.width; x++) {
 		for (var y = 0; y < grid.height; y++) {
 			var top = grid.get (x,y);
+
+			cube.addCube (vec3.fromValues(x,top + adj,y), cubeTypes.grass);
+
 			//bottom is the minimum of self and four neighbors.
 			var elems = [top];
 			if (x > 0) //left
@@ -108,7 +122,11 @@ function extrude (grid) {
 			if (y < grid.height-1)//bottom
 				elems.push (grid.get (x, y+1));
 			var bottom = Math.min.apply(Math, elems);
-			cube.set (x, y, top, bottom);
+
+			//fill in dirt.
+			for (var z = bottom; z < top; z++) {
+				cube.addCube (vec3.fromValues(x,z+adj,y), cubeTypes.dirt);
+			}
 		}
 	}
 	return cube;
@@ -218,14 +236,11 @@ function setupScene () {
 	var terrain = makeTerrain (size, height, roughness);
 	window.terrain = terrain;
 
-	for (var x = 0; x < size; x++)
-		for (var y = 0; y < size; y++)
-			setupColumn (x, y, terrain.get (x, y));
+	if (query.print) printToCanvas (terrain.grid);
+	else $('#bitmap').hide();
+	scene.push (terrain.createGeometry());
 
-	printToCanvas (terrain);
-	scene.push (terrainCombine);
-
-	camera.eye[1] -= 20;
+	camera.eye[1] -= 30;
 }
 
 var terrainCombine = new geometry ();
@@ -255,19 +270,19 @@ function printToCanvas (g) {
 	//var c = $('<canvas width=' + g.width * blockSize + ' height=' + g.height * blockSize + '>');
 	var c = $('#bitmap');
 	c.attr({width:g.width*blockSize,height:g.height*blockSize});
-	//var t = $('<table>');
+	var t = $('<table>');
 	var ctx = c[0].getContext('2d');
 	$('body').prepend(c);
-	//$('body').prepend(t);
+	$('body').prepend(t);
 	var max = -Infinity;
 	var min = Infinity;
 
 	for (var x = 0; x < g.width; x++) {
-		//var tr = $('<tr>');
-		//t.append(tr);
+		var tr = $('<tr>');
+		t.append(tr);
 		for (var y = 0; y < g.height; y++) {
-			var z = g.get (x, y).top;
-		//	 $('<td>').text(z).appendTo(tr);
+			var z = g.get (x, y);
+			 $('<td>').text(z).appendTo(tr);
 			
 			if (z > max) max = z;
 			if (z < min) min = z;
@@ -276,7 +291,7 @@ function printToCanvas (g) {
 
 	for (var x = 0; x < g.width; x++) {
 		for (var y = 0; y < g.height; y++) {
-			var z = g.get (x, y).top;
+			var z = g.get (x, y);
 			var color = Math.round((z-min)/(max-min)* 255);
 			ctx.fillStyle = color3i(color, color, color);
 			ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);

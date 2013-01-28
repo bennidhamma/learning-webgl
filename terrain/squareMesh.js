@@ -79,7 +79,7 @@ function SquareMesh () {
 		else if (face == faces.TOP) {
 			vertexKey = 'GHCD'
 			texIndex = texture[faceIndices.TOP];
-			texCoords = [0,0,1,0,0,1,1,1];
+			texCoords = [0.05,0,1,0,0.05,1,1,1];
 		}
 		else if (face == faces.BOTTOM) {
 			vertexKey = 'AEBF'
@@ -194,8 +194,9 @@ var TEXTURE_HEIGHT = 16;
 
 // [FRONT, BACK, TOP, BOTTOM, RIGHT, LEFT]
 var cubeTypes = {
-	'grass' : 	[3, 3, 0, 2, 3, 3],
-	'rock' :  	[1, 1, 1, 1, 1, 1]
+	'grass'   :	[3, 3, 0, 2, 3, 3],
+	'rock'    :	[1, 1, 1, 1, 1, 1],
+	'dirt'    : [2, 2, 2, 2, 2, 2]
 };
 
 function demoSquareMesh () {

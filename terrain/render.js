@@ -301,12 +301,13 @@ function geometry () {
 	};
 
 	this.getVertices = function () {
+		var out = [];
 		var vs = [];
 		//treat faces as triangle strips.
 		for (var f = 0; f < this.faceCount; f++) {
 			vs.push(this.faces[f].vertices);
 		};
-		return vs.concat.apply([], vs);
+		return out.concat.apply(out, vs);
 	};
 
 	this.getElementIndices = function () {
