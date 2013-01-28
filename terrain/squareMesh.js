@@ -44,7 +44,7 @@ function SquareMesh () {
 			else {
 				for (var faceKey in faces) {
 					var face = faces[faceKey];
-					if (this.isFaceVisible (pos, faces[face])) {
+					if (this.isFaceVisible (pos, face)) {
 						var faceInfo = this.prepareFace (pos, face, cube.cells[triple]);
 						mesh.pushFace (faceInfo);
 					}
@@ -58,9 +58,25 @@ function SquareMesh () {
 	};
 
 	this.isFaceVisible = function (pos, face) {
-		//TODO.
-		return true;
-	}
+		return this.getNeighbor(pos, face) == null;
+	};
+
+	this.getNeighbor = function (pos, face) {
+		var np = vec3.clone(pos);
+		if (face == faces.FRONT)
+			np[2]++;
+		else if (face == faces.BACK)
+			np[2]--;
+		else if (face == faces.TOP)
+			np[1]++;
+		else if (face == faces.BOTTOM)
+			np[1]--;
+		else if (face == faces.LEFT)
+			np[0]--;
+		else if (face == faces.RIGHT)
+			np[0]++;
+		return cube.cells[setTriplev(np)];
+	};
 
 	this.prepareFace = function (pos, face, texture) {
 		var texCoords = null;
