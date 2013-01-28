@@ -3,6 +3,14 @@ var mvMatrix = mat4.create ();
 var pMatrix = mat4.create ();
 var shaderProgram;
 var scene = [];
+var sceneInfo = {
+	ambient: vec3.fromValues(0.2, 0.2, 0.2),
+	directional: {
+		direction: vec3.fromValues(-1, -0.5, -1),
+		color: vec3.fromValues (0.8, 0.8, 0.8)
+	}
+}
+
 var paused = false;
 var canvas;
 var query = {};
@@ -35,6 +43,12 @@ function initGL (_canvas) {
 					paused = true;
 			}
 		});
+
+		//normalize and scale light
+		var dv = vec3.create ();
+		vec3.normalize (dv, sceneInfo.directional.direction);
+		vec3.scale (dv, dv, -1);
+		sceneInfo.directional.direction = dv;
 	}
 	catch (e) {
 		if (!gl) 
@@ -93,9 +107,18 @@ function initShaders () {
 		"aTextureCoord");
 	gl.enableVertexAttribArray (shaderProgram.vertexTextureAttribute);
 
+	shaderProgram.vertexNormalAttribute = gl.getAttribLocation (shaderProgram,
+		"aVertexNormal");
+	gl.enableVertexAttribArray (shaderProgram.vertexNormalAttribute);
+
 	shaderProgram.pMatrixUniform = gl.getUniformLocation (shaderProgram, "uPMatrix");
+	shaderProgram.nMatrixUniform = gl.getUniformLocation (shaderProgram, "uNMatrix");
 	shaderProgram.mvMatrixUniform = gl.getUniformLocation (shaderProgram, "uMVMatrix");
 	shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
+
+	shaderProgram.ambientColorUniform = gl.getUniformLocation(shaderProgram, "uAmbientColor");
+	shaderProgram.directionalColorUniform = gl.getUniformLocation(shaderProgram, "uDirectionalColor");
+	shaderProgram.lightingDirectionUniform = gl.getUniformLocation(shaderProgram, "uLightingDirection");
 }
 
 function setMatrixUniforms () {
@@ -121,15 +144,24 @@ function drawScene () {
 
 	mat4.identity(mvMatrix);
 	
+	setupLightingUniforms ();
+
 	mat4.rotateX(mvMatrix, mvMatrix, camera.pitch);
 	mat4.rotateY(mvMatrix, mvMatrix, camera.yaw);
 
 	//now move model view matrix to camera pos.
 	mat4.translate(mvMatrix,mvMatrix,camera.eye);
 
+
 	for (var i = 0; i < scene.length; i++) {
 		scene[i].draw ();
 	}
+}
+
+function setupLightingUniforms () {
+	gl.uniform3fv (shaderProgram.ambientColorUniform, sceneInfo.ambient);
+	gl.uniform3fv (shaderProgram.directionalColorUniform, sceneInfo.directional.color);
+	gl.uniform3fv (shaderProgram.lightingDirectionUniform, sceneInfo.directional.direction);
 }
 
 function getUpVector () {
@@ -260,7 +292,7 @@ function webGLStart () {
 
 	initBuffers ();
 
-	gl.clearColor (0.0, 0.0, 0.0, 1.0);
+	gl.clearColor (0.384, 0.596, 0.839, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 
 	setupEvents ();
@@ -338,24 +370,16 @@ function geometry () {
 		for (var f = 0; f < this.faceCount; f++) {
 			coordSets.push (this.faces[f].texCoords);
 		}
-		
-		/*
-		//treat faces as triangle strips.
-		for (var f in this.faces) {
-			var faceCoords = this.faces[f].texCoords;
-			var vc = 0;
-			for (var i = 2; i < faceCoords.length; i++)
-			{
-				coords.push (faceCoords[vc + i - 2]);
-				coords.push (faceCoords[vc + i - 1]);
-				coords.push (faceCoords[vc + i]);
-			}
-		}
-
-		return coords;
-		*/
-
 		return coords.concat.apply (coords, coordSets);
+	};
+
+	this.getNormals = function () {
+		var normals = [];
+		var normalSets = [];
+		for (var f = 0; f < this.faceCount; f++) {
+			normalSets.push (this.faces[f].normals);
+		}
+		return normals.concat.apply (normals, normalSets);
 	};
 
 	this.initBuffers = function () {
@@ -366,6 +390,10 @@ function geometry () {
 		this.textureBuffer = gl.createBuffer ();
 		gl.bindBuffer (gl.ARRAY_BUFFER, this.textureBuffer);
 		gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(this.getTextureCoords ()), gl.STATIC_DRAW);
+
+		this.normalBuffer = gl.createBuffer ();
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.normalBuffer);
+		gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(this.getNormals ()), gl.STATIC_DRAW);
 
 		this.indexBuffer = gl.createBuffer ();
 		var ei = new Uint16Array(this.getElementIndices ());
@@ -385,6 +413,10 @@ function geometry () {
 		gl.activeTexture (gl.TEXTURE0);
 		gl.bindTexture (gl.TEXTURE_2D, this.texture);
 		gl.uniform1i (shaderProgram.samplerUniform, 0);
+
+		//normals & lighting
+		gl.bindBuffer (gl.ARRAY_BUFFER, this.normalBuffer);
+		gl.vertexAttribPointer (shaderProgram.vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
 
 		//elements
 		gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);

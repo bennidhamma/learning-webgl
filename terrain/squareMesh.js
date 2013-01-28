@@ -58,6 +58,7 @@ function SquareMesh () {
 	};
 
 	this.isFaceVisible = function (pos, face) {
+		if (face == faces.BOTTOM) return false;
 		return this.getNeighbor(pos, face) == null;
 	};
 
@@ -81,36 +82,61 @@ function SquareMesh () {
 	this.prepareFace = function (pos, face, texture) {
 		var texCoords = null;
 		var vertexKey = null;
+		var normals = null;
 		var texIndex = 0;
 		if (face == faces.FRONT) {
 			vertexKey =  'EFGH';
 			texIndex = texture[faceIndices.FRONT];
 			texCoords = [0,1,1,1,0,0,1,0];
+			normals = [0, 0, 1,
+					   0, 0, 1,
+					   0, 0, 1,
+					   0, 0, 1];
 		}
 		else if (face == faces.BACK) {
 			vertexKey = 'ABCD';
 			texIndex = texture[faceIndices.BACK];
 			texCoords =	[1,1,0,1,1,0,0,0];
+			normals = [0, 0, -1,
+					   0, 0, -1,
+					   0, 0, -1,
+					   0, 0, -1];
 		}
 		else if (face == faces.TOP) {
 			vertexKey = 'GHCD'
 			texIndex = texture[faceIndices.TOP];
 			texCoords = [0.05,0,1,0,0.05,1,1,1];
+			normals = [0, 1, 0,
+					   0, 1, 0,
+					   0, 1, 0,
+					   0, 1, 0];
 		}
 		else if (face == faces.BOTTOM) {
 			vertexKey = 'AEBF'
 			texIndex = texture[faceIndices.BOTTOM];
 			texCoords = [0,0,1,0,0,1,1,1];
+			normals = [0, -1, 0,
+					   0, -1, 0,
+					   0, -1, 0,
+					   0, -1, 0];
 		}
 		else if (face == faces.RIGHT) {
 			vertexKey = 'BFDH'
 			texIndex = texture[faceIndices.RIGHT];
 			texCoords =	[0,1,1,1,0,0,1,0];
+			normals = [1, 0, 0,
+					   1, 0, 0,
+					   1, 0, 0,
+					   1, 0, 0];
 		}
 		else if (face == faces.LEFT) {
 			vertexKey = 'AECG'
 			texIndex = texture[faceIndices.LEFT];
 			texCoords =[0,1,1,1,0,0,1,0];
+			normals = [-1, 0, 0,
+					   -1, 0, 0,
+					   -1, 0, 0,
+					   -1, 0, 0];
 		}
 
 		var vertices = [];
@@ -131,7 +157,7 @@ function SquareMesh () {
 			texCoords[i+1] = (t + texCoords[i+1]) / TEXTURE_HEIGHT;
 		}
 
-		return {vertices: vertices, texCoords: texCoords};
+		return {vertices: vertices, texCoords: texCoords, normals: normals};
 	}
 }
 
@@ -198,8 +224,15 @@ function loadTextures (callback) {
 		gl.bindTexture(gl.TEXTURE_2D, texture);	
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		if (!query.mipmap) {
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		}
+		else {
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+			gl.generateMipmap(gl.TEXTURE_2D);
+		}
 		callback ();
 	};
 	img.src = filename;
