@@ -30,12 +30,15 @@ function SquareMesh () {
 	this.createGeometry = function () {
 		mesh = new geometry ();
 
+		var minv = vec3.fromValues(1024, 1024, 1024);
+		var maxv = vec3.fromValues(0, 0, 0);
+
 		for (var triple in cube.cells) {
 			// Need to test this cell against its neighbors 
 			// to determine face visibility. 
 			//
 			// If a face is visible, add it to the geometry.
-
+			
 			var pos = getTriple(triple);
 			if (showFace) {
 				var faceInfo = this.prepareFace (pos, showFace, cube.cells[triple]);
@@ -50,7 +53,14 @@ function SquareMesh () {
 					}
 				}
 			}
+
+			for (i = 0; i < 3; i++) {
+				if (pos[i] < minv[i]) minv[i] = pos[i];
+				else if (pos[i] > maxv[i]) maxv[i] = pos[i];
+			}
 		}
+
+		console.log ("minv: ", vec3.str(minv), "maxv: ", vec3.str(maxv));
 
 		mesh.setTexture (terrainTexture);
 
@@ -175,6 +185,14 @@ function setTriple(x,y,z) {
 
 function setTriplev(v) {
 	return (v[0] << 20) + (v[1] << 10) + v[2];
+}
+
+function setDouble (x, y) {
+	return (x << 16) + y;
+}
+
+function getDouble (i) {
+	return [i >>> 16, i << 16 >>> 16];
 }
 
 function tripleTests () {

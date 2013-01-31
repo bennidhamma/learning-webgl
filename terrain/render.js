@@ -323,6 +323,7 @@ function mvPop () {
 	mvMatrix = matrixStack.pop();
 }
 
+var MAX_CONCAT_COUNT = 65000;
 function geometry () {
 	this.faces = [];
 	this.faceCount = 0;
@@ -337,6 +338,10 @@ function geometry () {
 		var vs = [];
 		//treat faces as triangle strips.
 		for (var f = 0; f < this.faceCount; f++) {
+			if (vs.length > MAX_CONCAT_COUNT) {
+				out = out.concat.apply (out, vs);
+				vs = [];
+			}
 			vs.push(this.faces[f].vertices);
 		};
 		return out.concat.apply(out, vs);
@@ -368,6 +373,10 @@ function geometry () {
 		var coords = [];
 		var coordSets = [];
 		for (var f = 0; f < this.faceCount; f++) {
+			if (coordSets.length > MAX_CONCAT_COUNT) {
+				coords = coords.concat.apply (coords, coordSets);
+				coordSets = [];
+			}
 			coordSets.push (this.faces[f].texCoords);
 		}
 		return coords.concat.apply (coords, coordSets);
@@ -377,6 +386,10 @@ function geometry () {
 		var normals = [];
 		var normalSets = [];
 		for (var f = 0; f < this.faceCount; f++) {
+			if (normalSets.length > MAX_CONCAT_COUNT) {
+				normals = normals.concat.apply (normals, normalSets);
+				normalSets = [];
+			}
 			normalSets.push (this.faces[f].normals);
 		}
 		return normals.concat.apply (normals, normalSets);
